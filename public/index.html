@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>长截图拼接工具</title>
+    <link rel="icon" href="data:,">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f8f9fa;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .main-container {
+            flex: 1;
+            padding: 10px;
+            padding-top: 54px;
+            padding-bottom: 60px;
+            max-width: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .image-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 8px;
+            align-items: flex-start;
+            min-height: 0;
+        }
+
+        .canvas-wrapper {
+            flex: 1;
+            min-width: calc(33.33% - 12px);
+            max-width: calc(33.33% - 12px);
+            position: relative;
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        .canvas-wrapper.dragging {
+            opacity: 0.95;
+            z-index: 1000;
+            transform: scale(1.02);
+        }
+
+        .canvas-inner {
+            border-radius: 8px;
+            overflow: hidden;
+            background: white;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 8px;
+            cursor: move;
+            cursor: grab;
+        }
+
+        .canvas-wrapper canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        #status {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 12px;
+            background: #007bff;
+            color: white;
+            font-size: 14px;
+            text-align: center;
+            z-index: 100;
+            font-weight: 500;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .bottom-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #007bff;
+            display: flex;
+            padding: 0;
+            z-index: 100;
+        }
+
+        .bottom-bar button {
+            flex: 1;
+            margin: 0;
+            padding: 12px 0;
+            border: none;
+            background: #007bff;
+            color: white;
+            font-size: 16px;
+            font-weight: 500;
+            transition: opacity 0.2s;
+        }
+
+        .bottom-bar button:active {
+            opacity: 0.7;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            flex: 1;
+            margin: 0;
+        }
+
+        .file-input-wrapper input[type="file"] {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .file-input-label {
+            display: block;
+            width: 100%;
+            padding: 12px 0;
+            background: #007bff;
+            color: white;
+            text-align: center;
+            font-size: 16px;
+            font-weight: 500;
+            transition: opacity 0.2s;
+        }
+
+        .file-input-label:active {
+            opacity: 0.7;
+        }
+
+        #resultsContainer {
+            padding: 10px;
+            padding-top: 0;
+            padding-bottom: 0;
+        }
+
+        /* 移动端适配 */
+        @media (max-width: 480px) {
+            .main-container {
+                padding: 6px;
+                padding-top: 54px;
+                padding-bottom: 60px;
+            }
+
+            .image-container {
+                gap: 6px;
+                padding: 6px;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            .canvas-wrapper {
+                min-width: calc(33.33% - 8px);
+                max-width: calc(33.33% - 8px);
+            }
+
+            .canvas-wrapper.dragging {
+                opacity: 0.9;
+            }
+        }
+
+        /* 隐藏文件名显示 */
+        .canvas-number {
+            display: none;
+        }
+
+        /* Sortable.js 专用样式 */
+        .sortable-ghost {
+            opacity: 0.5;
+        }
+
+        .sortable-drag {
+            opacity: 0.95;
+            transform: scale(1.02);
+        }
+
+        .sortable-chosen {
+            cursor: grabbing;
+        }
+
+        /* 结果显示样式 */
+        .result-item {
+            display: none;
+            /* 隐藏文字结果 */
+        }
+
+        /* 合并结果样式 */
+        .merge-result {
+            margin: 0;
+            padding-bottom: 10px;
+        }
+
+        .merge-result h3 {
+            display: none;
+            /* 隐藏"合并结果"标题 */
+        }
+
+        .merge-result canvas {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="status">等待上传图片</div>
+
+    <div class="main-container">
+        <div id="imageContainer" class="image-container"></div>
+        <div id="resultsContainer"></div>
+    </div>
+
+    <div class="bottom-bar">
+        <div class="file-input-wrapper">
+            <label class="file-input-label">添加图片</label>
+            <input type="file" id="imageInput" accept="image/*" multiple>
+        </div>
+        <button id="processBtn">竖向拼接</button>
+        <button id="clearBtn">清除</button>
+    </div>
+
+    <!-- 修改 Sortable.js 的引入方式 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <script src="./imageStitcher.js"></script>
+    <script src="./imageMerger.js"></script>
+    <script src="./main.js"></script>
+
+    <script>
+        // 用于测试 Sortable 是否正确加载
+        window.addEventListener('DOMContentLoaded', () => {
+            if (typeof Sortable === 'undefined') {
+                console.error('Sortable is not loaded!');
+            } else {
+                console.log('Sortable is loaded successfully!');
+            }
+        });
+    </script>
+</body>
+
+</html>
